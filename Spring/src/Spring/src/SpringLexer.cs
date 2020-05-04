@@ -7,7 +7,7 @@ namespace JetBrains.ReSharper.Plugins.Spring
 {
     public class SpringLexer : ILexer<int>
     {
-        private readonly SolidityLexer _solidityAntlrLexer;
+        private readonly ToylangLexer _toyLangAntlrLexer;
         private IToken _token;
         private int _currentPosition;
 
@@ -15,7 +15,7 @@ namespace JetBrains.ReSharper.Plugins.Spring
         {
             Buffer = buffer;
             _currentPosition = 0;
-            _solidityAntlrLexer = new SolidityLexer(new AntlrInputStream(buffer.GetText()));
+            _toyLangAntlrLexer = new ToylangLexer(new AntlrInputStream(buffer.GetText()));
         }
 
         public void Start()
@@ -25,7 +25,7 @@ namespace JetBrains.ReSharper.Plugins.Spring
 
         public void Advance()
         {
-            _token = _solidityAntlrLexer.NextToken();
+            _token = _toyLangAntlrLexer.NextToken();
             Logger.Default.Log(
                 $"Advanced token type is {_token.Type} start {_token.StartIndex} stop {_token.StopIndex + 1}");
             _currentPosition++;
@@ -36,11 +36,11 @@ namespace JetBrains.ReSharper.Plugins.Spring
             get => _currentPosition;
             set
             {
-                _solidityAntlrLexer.Reset();
+                _toyLangAntlrLexer.Reset();
                 _currentPosition = 0;
                 while (_currentPosition < value)
                 {
-                    _token = _solidityAntlrLexer.NextToken();
+                    _token = _toyLangAntlrLexer.NextToken();
                     _currentPosition++;
                 }
             }
