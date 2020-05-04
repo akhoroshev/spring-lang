@@ -126,6 +126,7 @@ VersionLiteral=125
 WS=126
 COMMENT=127
 LINE_COMMENT=128
+UNKNOWN=129
 'pragma'=1
 ';'=2
 '^'=3

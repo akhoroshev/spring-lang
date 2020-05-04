@@ -489,3 +489,5 @@ COMMENT
 
 LINE_COMMENT
   : '//' ~[\r\n]* -> channel(HIDDEN) ;
+  
+UNKNOWN  : . ; 
