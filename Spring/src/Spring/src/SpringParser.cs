@@ -52,20 +52,20 @@ namespace JetBrains.ReSharper.Plugins.Spring
             while (!builder.Eof())
             {
                 var tt = builder.GetTokenType();
-                if (tt == CSharpTokenType.LBRACE)
+                if (tt == SpringTokenType.LEFT_CURLY_BRACKET)
                 {
                     var start = builder.Mark();
                     builder.AdvanceLexer();
                     ParseBlock(builder);
 
-                    if (builder.GetTokenType() != CSharpTokenType.RBRACE)
+                    if (builder.GetTokenType() != SpringTokenType.RIGHT_CURLY_BRACKET)
                         builder.Error("Expected '}'");
                     else
                         builder.AdvanceLexer();
                     
                     builder.Done(start, SpringCompositeNodeType.BLOCK, null);
                 }
-                else if (tt == CSharpTokenType.RBRACE)
+                else if (tt == SpringTokenType.RIGHT_CURLY_BRACKET)
                     return;
                 else builder.AdvanceLexer();
                 

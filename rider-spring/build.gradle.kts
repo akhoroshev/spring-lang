@@ -77,7 +77,9 @@ val repoRoot = projectDir.parentFile!!
 val resharperPluginPath = File(repoRoot, "Spring")
 val buildConfiguration = ext.properties["BuildConfiguration"] ?: "Debug"
 
-val libFiles = listOf<String>()
+val libFiles = listOf(
+        "Spring/bin/$buildConfiguration/net461/Antlr4.Runtime.Standard.dll"
+)
 
 val pluginFiles = listOf(
         "Spring/bin/$buildConfiguration/net461/JetBrains.ReSharper.Plugins.Spring")
