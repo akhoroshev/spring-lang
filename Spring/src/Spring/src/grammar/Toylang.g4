@@ -1,7 +1,7 @@
 grammar Toylang;
 
 file
-    : block
+    : block EOF
     ;
 
 block

@@ -2,8 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using Antlr4.Runtime;
+using Antlr4.Runtime.Misc;
 using ICSharpCode.NRefactory.CSharp;
 using JetBrains.Application.Settings;
+using JetBrains.Core;
+using JetBrains.Diagnostics;
 using JetBrains.DocumentModel;
 using JetBrains.Lifetimes;
 using JetBrains.ProjectModel;
@@ -20,55 +24,90 @@ using JetBrains.ReSharper.Psi.Parsing;
 using JetBrains.ReSharper.Psi.Tree;
 using JetBrains.ReSharper.Psi.TreeBuilder;
 using JetBrains.Text;
+using JetBrains.Util.Logging;
+using Logger = JetBrains.ReSharper.Plugins.Spring.Util.Logger;
 
 namespace JetBrains.ReSharper.Plugins.Spring
 {
     internal class SpringParser : IParser
     {
-        private readonly ILexer myLexer;
+        private readonly ILexer _lexer;
 
         public SpringParser(ILexer lexer)
         {
-            myLexer = lexer;
+            _lexer = lexer;
         }
 
         public IFile ParseFile()
         {
             using (var def = Lifetime.Define())
             {
-                var builder = new PsiBuilder(myLexer, SpringFileNodeType.Instance, new TokenFactory(), def.Lifetime);
-                var fileMark = builder.Mark();
+                var builder = new PsiBuilder(_lexer, SpringFileNodeType.Instance, new TokenFactory(), def.Lifetime);
 
-                ParseBlock(builder);
+                var lexer = new ToylangLexer(new AntlrInputStream(_lexer.Buffer.GetText()));
+                var parser = new ToylangParser(new CommonTokenStream(lexer));
 
-                builder.Done(fileMark, SpringFileNodeType.Instance, null);
-                var file = (IFile)builder.BuildTree();
+                new MyVisitor(builder).Visit(parser.file());
+
+                var file = (IFile) builder.BuildTree();
                 return file;
             }
         }
 
-        private void ParseBlock(PsiBuilder builder)
-        {
-            while (!builder.Eof())
-            {
-                var tt = builder.GetTokenType();
-                if (tt == SpringTokenType.LEFT_CURLY_BRACKET)
-                {
-                    var start = builder.Mark();
-                    builder.AdvanceLexer();
-                    ParseBlock(builder);
 
-                    if (builder.GetTokenType() != SpringTokenType.RIGHT_CURLY_BRACKET)
-                        builder.Error("Expected '}'");
-                    else
-                        builder.AdvanceLexer();
-                    
-                    builder.Done(start, SpringCompositeNodeType.BLOCK, null);
-                }
-                else if (tt == SpringTokenType.RIGHT_CURLY_BRACKET)
-                    return;
-                else builder.AdvanceLexer();
-                
+        private class MyVisitor : ToylangBaseVisitor<Unit>
+        {
+            private readonly PsiBuilder _psiBuilder;
+
+            public MyVisitor(PsiBuilder psiBuilder)
+            {
+                _psiBuilder = psiBuilder;
+            }
+
+            private int BeginCreatingNode(int begin)
+            {
+                _psiBuilder.ResetCurrentLexeme(begin, begin);
+                return _psiBuilder.Mark();
+            }
+
+            private void EndCreatingNode(int mark, int end, CompositeNodeType nodeType)
+            {
+                _psiBuilder.ResetCurrentLexeme(end, end);
+                _psiBuilder.Done(mark, nodeType, null);
+            }
+
+            private void CreateNode(ParserRuleContext context, int begin, int end, CompositeNodeType nodeType)
+            {
+                var mark = BeginCreatingNode(begin);
+
+                base.VisitChildren(context);
+
+                EndCreatingNode(mark, end, nodeType);
+            }
+
+            private static Interval GetInterval(ParserRuleContext context)
+            {
+                Assertion.Assert(context.Start != null, "start token must be not null");
+                return context.Stop == null
+                    ? new Interval(context.Start.TokenIndex, context.Start.TokenIndex)
+                    : context.SourceInterval;
+            }
+
+
+            public override Unit VisitFile(ToylangParser.FileContext context)
+            {
+                var interval = GetInterval(context);
+                // start file from begin of the file
+                CreateNode(context, 0, interval.b, SpringFileNodeType.Instance);
+                return Unit.Instance;
+            }
+
+
+            public override Unit VisitStmtFunction(ToylangParser.StmtFunctionContext context)
+            {
+                var interval = GetInterval(context);
+                CreateNode(context, interval.a, interval.b, SpringCompositeNodeType.BLOCK);
+                return Unit.Instance;
             }
         }
     }
@@ -76,7 +115,8 @@ namespace JetBrains.ReSharper.Plugins.Spring
     [DaemonStage]
     class SpringDaemonStage : DaemonStageBase<SpringFile>
     {
-        protected override IDaemonStageProcess CreateDaemonProcess(IDaemonProcess process, DaemonProcessKind processKind, SpringFile file,
+        protected override IDaemonStageProcess CreateDaemonProcess(IDaemonProcess process,
+            DaemonProcessKind processKind, SpringFile file,
             IContextBoundSettingsStore settingsStore)
         {
             return new SpringDaemonProcess(process, file);
@@ -99,10 +139,11 @@ namespace JetBrains.ReSharper.Plugins.Spring
                     if (treeNode is PsiBuilderErrorElement error)
                     {
                         var range = error.GetDocumentRange();
-                        highlightings.Add(new HighlightingInfo(range, new CSharpSyntaxError(error.ErrorDescription, range)));
+                        highlightings.Add(new HighlightingInfo(range,
+                            new CSharpSyntaxError(error.ErrorDescription, range)));
                     }
                 }
-                
+
                 var result = new DaemonStageResult(highlightings);
                 committer(result);
             }
@@ -112,9 +153,9 @@ namespace JetBrains.ReSharper.Plugins.Spring
 
         protected override IEnumerable<SpringFile> GetPsiFiles(IPsiSourceFile sourceFile)
         {
-            yield return (SpringFile)sourceFile.GetDominantPsiFile<SpringLanguage>();
+            yield return (SpringFile) sourceFile.GetDominantPsiFile<SpringLanguage>();
         }
-    } 
+    }
 
     internal class TokenFactory : IPsiBuilderTokenFactory
     {
@@ -124,7 +165,7 @@ namespace JetBrains.ReSharper.Plugins.Spring
         }
     }
 
-    [ProjectFileType(typeof (SpringProjectFileType))]
+    [ProjectFileType(typeof(SpringProjectFileType))]
     public class SelectEmbracingConstructProvider : ISelectEmbracingConstructProvider
     {
         public bool IsAvailable(IPsiSourceFile sourceFile)
