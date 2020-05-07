@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Misc;
+using Antlr4.Runtime.Tree;
 using ICSharpCode.NRefactory.CSharp;
 using JetBrains.Application.Settings;
 using JetBrains.Core;
@@ -43,24 +44,35 @@ namespace JetBrains.ReSharper.Plugins.Spring
             using (var def = Lifetime.Define())
             {
                 var builder = new PsiBuilder(_lexer, SpringFileNodeType.Instance, new TokenFactory(), def.Lifetime);
-
                 var lexer = new ToylangLexer(new AntlrInputStream(_lexer.Buffer.GetText()));
                 var parser = new ToylangParser(new CommonTokenStream(lexer));
+                parser.AddErrorListener(new SpringErrorListener(builder));
+                var visitor = new NodeVisitor(builder);
 
-                new MyVisitor(builder).Visit(parser.file());
+                // Begin Top level File
+                var fileBeginMark = builder.Mark();
 
-                var file = (IFile) builder.BuildTree();
+                // Inner structure
+                visitor.Visit(parser.file());
+
+                // End Top level File
+                builder.ResetCurrentLexeme(visitor.MaxTokenIndexConsumed, visitor.MaxTokenIndexConsumed);
+                builder.Done(fileBeginMark, SpringFileNodeType.Instance, null);
+
+                var compositeElement = builder.BuildTree();
+                var file = (IFile) compositeElement;
                 return file;
             }
         }
 
 
-        private class MyVisitor : ToylangBaseVisitor<Unit>
+        private class NodeVisitor : ToylangBaseVisitor<Unit>
         {
             private readonly PsiBuilder _psiBuilder;
 
-            public MyVisitor(PsiBuilder psiBuilder)
+            public NodeVisitor(PsiBuilder psiBuilder)
             {
+                MaxTokenIndexConsumed = 0;
                 _psiBuilder = psiBuilder;
             }
 
@@ -70,75 +82,87 @@ namespace JetBrains.ReSharper.Plugins.Spring
                 return _psiBuilder.Mark();
             }
 
-            private void EndCreatingNode(int mark, int end, CompositeNodeType nodeType)
+            private void EndCreatingNode(int mark, int end, CompositeNodeType nodeType, object data)
             {
                 _psiBuilder.ResetCurrentLexeme(end, end);
-                _psiBuilder.Done(mark, nodeType, null);
+                _psiBuilder.Done(mark, nodeType, data);
             }
 
-            private void CreateNode(ParserRuleContext context, int begin, int end, CompositeNodeType nodeType)
+            private void CreateNode(ParserRuleContext context, int begin, int end, CompositeNodeType nodeType,
+                object data)
             {
                 var mark = BeginCreatingNode(begin);
-
                 base.VisitChildren(context);
-
-                EndCreatingNode(mark, end, nodeType);
+                EndCreatingNode(mark, end, nodeType, data);
             }
-
-            private static Interval GetInterval(ParserRuleContext context)
-            {
-                Assertion.Assert(context.Start != null, "start token must be not null");
-                return context.Stop == null
-                    ? new Interval(context.Start.TokenIndex, context.Start.TokenIndex)
-                    : context.SourceInterval;
-            }
-
-
-            public override Unit VisitFile(ToylangParser.FileContext context)
-            {
-                var interval = GetInterval(context);
-                // start file from begin of the file
-                CreateNode(context, 0, interval.b, SpringFileNodeType.Instance);
-                return Unit.Instance;
-            }
-
 
             public override Unit VisitStmtFunction(ToylangParser.StmtFunctionContext context)
             {
-                var interval = GetInterval(context);
-                CreateNode(context, interval.a, interval.b, SpringCompositeNodeType.BLOCK);
+                var interval = context.SourceInterval;
+                CreateNode(context, interval.a, interval.b, SpringCompositeNodeType.NodeTypeFunction, context);
                 return Unit.Instance;
             }
+
+            public override Unit VisitTerminal(ITerminalNode node)
+            {
+                MaxTokenIndexConsumed = Math.Max(node.Symbol.TokenIndex, MaxTokenIndexConsumed);
+                return base.VisitTerminal(node);
+            }
+
+            public int MaxTokenIndexConsumed { get; private set; }
+        }
+    }
+
+    class SpringErrorListener : BaseErrorListener
+    {
+        private readonly PsiBuilder _builder;
+
+        public SpringErrorListener(PsiBuilder builder)
+        {
+            _builder = builder;
+        }
+
+        public override void SyntaxError(
+            TextWriter output, IRecognizer recognizer, IToken offendingSymbol,
+            int line, int charPositionInLine, string msg, RecognitionException e
+        )
+        {
+            _builder.ResetCurrentLexeme(offendingSymbol.TokenIndex, offendingSymbol.TokenIndex);
+            var mark = _builder.Mark();
+            var length = offendingSymbol.StopIndex - offendingSymbol.StartIndex + 1;
+            _builder.Done(mark, SpringErrorNodeType.Instance, new SpringErrorNodeType.Message(msg, length));
         }
     }
 
     [DaemonStage]
-    class SpringDaemonStage : DaemonStageBase<SpringFile>
+    class SpringDaemonStage : DaemonStageBase<SpringNodeFile>
     {
         protected override IDaemonStageProcess CreateDaemonProcess(IDaemonProcess process,
-            DaemonProcessKind processKind, SpringFile file,
+            DaemonProcessKind processKind, SpringNodeFile file,
             IContextBoundSettingsStore settingsStore)
         {
             return new SpringDaemonProcess(process, file);
         }
 
-        internal class SpringDaemonProcess : IDaemonStageProcess
+        private class SpringDaemonProcess : IDaemonStageProcess
         {
-            private readonly SpringFile myFile;
-            public SpringDaemonProcess(IDaemonProcess process, SpringFile file)
+            private readonly SpringNodeFile _file;
+
+            public SpringDaemonProcess(IDaemonProcess process, SpringNodeFile file)
             {
-                myFile = file;
+                _file = file;
                 DaemonProcess = process;
             }
 
             public void Execute(Action<DaemonStageResult> committer)
             {
                 var highlightings = new List<HighlightingInfo>();
-                foreach (var treeNode in myFile.Descendants())
+
+                foreach (var treeNode in _file.Descendants())
                 {
-                    if (treeNode is PsiBuilderErrorElement error)
+                    if (treeNode is SpringNodeError error)
                     {
-                        var range = error.GetDocumentRange();
+                        var range = error.GetDocumentRange().ExtendRight(error.Length);
                         highlightings.Add(new HighlightingInfo(range,
                             new CSharpSyntaxError(error.ErrorDescription, range)));
                     }
@@ -151,9 +175,9 @@ namespace JetBrains.ReSharper.Plugins.Spring
             public IDaemonProcess DaemonProcess { get; }
         }
 
-        protected override IEnumerable<SpringFile> GetPsiFiles(IPsiSourceFile sourceFile)
+        protected override IEnumerable<SpringNodeFile> GetPsiFiles(IPsiSourceFile sourceFile)
         {
-            yield return (SpringFile) sourceFile.GetDominantPsiFile<SpringLanguage>();
+            yield return (SpringNodeFile) sourceFile.GetDominantPsiFile<SpringLanguage>();
         }
     }
 
@@ -175,14 +199,14 @@ namespace JetBrains.ReSharper.Plugins.Spring
 
         public ISelectedRange GetSelectedRange(IPsiSourceFile sourceFile, DocumentRange documentRange)
         {
-            var file = (SpringFile) sourceFile.GetDominantPsiFile<SpringLanguage>();
+            var file = (SpringNodeFile) sourceFile.GetDominantPsiFile<SpringLanguage>();
             var node = file.FindNodeAt(documentRange);
             return new SpringTreeNodeSelection(file, node);
         }
 
-        public class SpringTreeNodeSelection : TreeNodeSelection<SpringFile>
+        public class SpringTreeNodeSelection : TreeNodeSelection<SpringNodeFile>
         {
-            public SpringTreeNodeSelection(SpringFile fileNode, ITreeNode node) : base(fileNode, node)
+            public SpringTreeNodeSelection(SpringNodeFile fileNode, ITreeNode node) : base(fileNode, node)
             {
             }
 
