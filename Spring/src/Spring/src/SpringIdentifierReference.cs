@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using JetBrains.Annotations;
 using JetBrains.ReSharper.Psi;
 using JetBrains.ReSharper.Psi.ExtensionsAPI.Resolve;
@@ -15,21 +16,37 @@ namespace JetBrains.ReSharper.Plugins.Spring
             _owner = owner;
         }
 
+        private static IEnumerable<ITreeNode> TreeTraverseBottomUpLeft(ITreeNode node)
+        {
+            var current = node;
+            foreach (var parent in node.PathToRoot())
+            {
+                foreach (var item in parent.Children())
+                {
+                    yield return item;
+                    if (item.Equals(current))
+                        break;
+                }
+
+                current = parent;
+            }
+        }
+
         public override ResolveResultWithInfo ResolveWithoutCache()
         {
             var file = _owner.GetContainingFile();
             if (file == null) return ResolveResultWithInfo.Unresolved;
-
-            var root = _owner.Root();
             
-            foreach (var child in root.Descendants())
+
+            foreach (var item in TreeTraverseBottomUpLeft(_owner))
             {
-                if (child is IDeclaration declaration && declaration.DeclaredName == GetName())
+                if (item is IDeclaration declaration && declaration.DeclaredName == GetName())
                 {
-                    return new ResolveResultWithInfo(new SimpleResolveResult(declaration.DeclaredElement), ResolveErrorType.OK);
+                    return new ResolveResultWithInfo(new SimpleResolveResult(declaration.DeclaredElement),
+                        ResolveErrorType.OK);
                 }
             }
-            
+
             return ResolveResultWithInfo.Unresolved;
         }
 
