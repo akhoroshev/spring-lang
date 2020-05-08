@@ -101,7 +101,7 @@ namespace JetBrains.ReSharper.Plugins.Spring
             {
                 if (context.exception != null)
                     return Unit.Instance;
-                
+
                 var interval = context.SourceInterval;
                 CreateNode(context, interval.a, interval.b + 1, SpringCompositeNodeType.NodeTypeIdentifierDeclaration,
                     context);
@@ -112,7 +112,7 @@ namespace JetBrains.ReSharper.Plugins.Spring
             {
                 if (context.exception != null)
                     return Unit.Instance;
-                
+
                 var interval = context.SourceInterval;
                 CreateNode(context, interval.a, interval.b + 1, SpringCompositeNodeType.NodeTypeIdentifierDeclaration,
                     context);
@@ -129,12 +129,14 @@ namespace JetBrains.ReSharper.Plugins.Spring
 
             public override Unit VisitIdentifier(ToylangParser.IdentifierContext context)
             {
+                if (context.GetText().Equals(String.Empty))
+                    return Unit.Instance;
+
                 var interval = context.SourceInterval;
                 CreateNode(context, interval.a, interval.b + 1, SpringCompositeNodeType.NodeTypeIdentifier, context);
                 return Unit.Instance;
             }
-            
-            
+
             public override Unit VisitBlock(ToylangParser.BlockContext context)
             {
                 var interval = context.SourceInterval;

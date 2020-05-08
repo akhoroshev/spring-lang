@@ -9,11 +9,11 @@ namespace JetBrains.ReSharper.Plugins.Spring
 {
     public class SpringIdentifierReference : TreeReferenceBase<SpringNodeIdentifier>
     {
-        private readonly SpringNodeIdentifier _owner;
+        private readonly SpringNodeIdentifier _identifier;
 
-        public SpringIdentifierReference([NotNull] SpringNodeIdentifier owner) : base(owner)
+        public SpringIdentifierReference([NotNull] SpringNodeIdentifier identifier) : base(identifier)
         {
-            _owner = owner;
+            _identifier = identifier;
         }
 
         private static IEnumerable<ITreeNode> TreeTraverseBottomUpLeft(ITreeNode node)
@@ -34,11 +34,11 @@ namespace JetBrains.ReSharper.Plugins.Spring
 
         public override ResolveResultWithInfo ResolveWithoutCache()
         {
-            var file = _owner.GetContainingFile();
+            var file = _identifier.GetContainingFile();
             if (file == null) return ResolveResultWithInfo.Unresolved;
             
 
-            foreach (var item in TreeTraverseBottomUpLeft(_owner))
+            foreach (var item in TreeTraverseBottomUpLeft(_identifier))
             {
                 if (item is IDeclaration declaration && declaration.DeclaredName == GetName())
                 {
@@ -50,21 +50,21 @@ namespace JetBrains.ReSharper.Plugins.Spring
             return ResolveResultWithInfo.Unresolved;
         }
 
-        public override string GetName() => _owner.Name;
+        public override string GetName() => _identifier.Name;
 
         public override ISymbolTable GetReferenceSymbolTable(bool useReferenceName)
         {
             throw new System.NotImplementedException();
         }
 
-        public override TreeTextRange GetTreeTextRange() => _owner.GetTreeTextRange();
+        public override TreeTextRange GetTreeTextRange() => _identifier.GetTreeTextRange();
 
         public override IReference BindTo(IDeclaredElement element) => this;
 
         public override IReference BindTo(IDeclaredElement element, ISubstitution substitution) => this;
 
-        public override IAccessContext GetAccessContext() => new DefaultAccessContext(_owner);
+        public override IAccessContext GetAccessContext() => new DefaultAccessContext(_identifier);
 
-        public override bool IsValid() => _owner.IsValid();
+        public override bool IsValid() => _identifier.IsValid();
     }
 }

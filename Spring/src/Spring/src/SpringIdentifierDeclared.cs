@@ -30,7 +30,7 @@ namespace JetBrains.ReSharper.Plugins.Spring
                 : new ArrayList<IDeclaration> {_declaration};
         }
 
-        public DeclaredElementType GetElementType() => CLRDeclaredElementType.METHOD;
+        public DeclaredElementType GetElementType() => CLRDeclaredElementType.LOCAL_VARIABLE;
 
         public XmlNode GetXMLDoc(bool inherit) => null;
 

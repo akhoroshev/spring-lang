@@ -1,3 +1,7 @@
+## Plugin for [ToyLang](https://github.com/akhoroshev/kotlin-course-se19/tree/02-fun-interpreter)
+
+![plugin-demo](https://user-images.githubusercontent.com/26367308/81393518-2cd40300-9129-11ea-894e-06f24bb7893d.gif)
+
 ## Building the plugin
 
 ### Requirements
