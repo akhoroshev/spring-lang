@@ -131,6 +131,18 @@ public partial class ToylangBaseListener : IToylangListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitFunctionParameterNames([NotNull] ToylangParser.FunctionParameterNamesContext context) { }
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ToylangParser.functionParameter"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterFunctionParameter([NotNull] ToylangParser.FunctionParameterContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ToylangParser.functionParameter"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitFunctionParameter([NotNull] ToylangParser.FunctionParameterContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ToylangParser.stmtWhile"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>

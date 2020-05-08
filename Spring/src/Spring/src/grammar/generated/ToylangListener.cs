@@ -111,6 +111,16 @@ public interface IToylangListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitFunctionParameterNames([NotNull] ToylangParser.FunctionParameterNamesContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ToylangParser.functionParameter"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterFunctionParameter([NotNull] ToylangParser.FunctionParameterContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ToylangParser.functionParameter"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitFunctionParameter([NotNull] ToylangParser.FunctionParameterContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ToylangParser.stmtWhile"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

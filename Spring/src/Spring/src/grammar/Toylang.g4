@@ -2,14 +2,16 @@ grammar Toylang;
 
 file
     : block EOF
+    | EOF
     ;
 
 block
-    : statement*
+    : statement+
     ;
 
 blockWithBraces
     : '{' block '}'
+    | '{' '}'
     ;
 
 statement
@@ -28,16 +30,20 @@ stmtComment
     ;
 
 stmtFunction
-    : KW_FUN IDENTIFIER '(' functionParameterNames ')' blockWithBraces
+    : KW_FUN identifier '(' functionParameterNames ')' blockWithBraces
     ;
 
 stmtVariable
-    : KW_VAR IDENTIFIER ('=' stmtExpression)?
+    : KW_VAR identifier ('=' stmtExpression)?
     ;
 
 functionParameterNames
-    : (parameters += IDENTIFIER)(',' parameters += IDENTIFIER)*
+    : (parameters += functionParameter)(',' parameters += functionParameter)*
     | /* epsilon */
+    ;
+    
+functionParameter
+    : identifier
     ;
 
 stmtWhile
@@ -49,7 +55,7 @@ stmtIf
     ;
 
 stmtAssigment
-    : IDENTIFIER '=' stmtExpression
+    : identifier '=' stmtExpression
     ;
 
 stmtReturn
@@ -61,7 +67,7 @@ stmtExpression
     ;
 
 functionCall
-    : IDENTIFIER '(' functionArguments ')'
+    : identifier '(' functionArguments ')'
     ;
 
 functionArguments

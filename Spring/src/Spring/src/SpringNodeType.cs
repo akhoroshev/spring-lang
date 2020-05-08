@@ -54,13 +54,25 @@ namespace JetBrains.ReSharper.Plugins.Spring
 
     internal class SpringCompositeNodeType : CompositeNodeWithArgumentType
     {
-        public static readonly SpringCompositeNodeType NodeTypeBlock = new SpringCompositeNodeType("Spring_BLOCK", 0);
-        public static readonly SpringCompositeNodeType NodeTypeFunction = new SpringCompositeNodeType("Spring_FUN", 1);
+        public static readonly SpringCompositeNodeType NodeTypeBlock =
+            new SpringCompositeNodeType("Spring_BLOCK", 0, typeof(SpringNodeCompositeAntlr));
 
-        private SpringCompositeNodeType(string s, int index) : base(s, index)
+        public static readonly SpringCompositeNodeType NodeTypeFunction =
+            new SpringCompositeNodeType("Spring_FUN", 1, typeof(SpringNodeCompositeAntlr));
+
+        public static readonly SpringCompositeNodeType NodeTypeIdentifier =
+            new SpringCompositeNodeType("Spring_IDENTIFIER", 2, typeof(SpringNodeIdentifier));
+
+        public static readonly SpringCompositeNodeType NodeTypeIdentifierDeclaration =
+            new SpringCompositeNodeType("Spring_IDENTIFIER_DECL", 3, typeof(SpringNodeIdentifierDeclaration));
+
+
+        private readonly Type _nodeConstructor;
+
+        private SpringCompositeNodeType(string s, int index, Type nodeConstructor) : base(s, index)
         {
+            _nodeConstructor = nodeConstructor;
         }
-
 
         public override CompositeElement Create()
         {
@@ -70,7 +82,7 @@ namespace JetBrains.ReSharper.Plugins.Spring
         public override CompositeElement Create(object o)
         {
             var antlrContext = (RuleContext) o;
-            return new SpringNodeCompositeAntlr(antlrContext, this);
+            return (CompositeElement) Activator.CreateInstance(_nodeConstructor, antlrContext, this);
         }
     }
 }

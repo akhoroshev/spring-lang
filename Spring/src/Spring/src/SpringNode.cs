@@ -1,7 +1,12 @@
+using System.Linq;
+using System.Xml;
 using Antlr4.Runtime;
+using ICSharpCode.NRefactory.CSharp;
 using JetBrains.ReSharper.Psi;
 using JetBrains.ReSharper.Psi.ExtensionsAPI.Tree;
 using JetBrains.ReSharper.Psi.Tree;
+using JetBrains.Util;
+using NodeType = JetBrains.ReSharper.Psi.ExtensionsAPI.Tree.NodeType;
 
 namespace JetBrains.ReSharper.Plugins.Spring
 {
@@ -36,9 +41,42 @@ namespace JetBrains.ReSharper.Plugins.Spring
             Context = context;
         }
 
-        public RuleContext Context { get; set; }
+        protected RuleContext Context { get; }
 
         public override NodeType NodeType { get; }
         public override PsiLanguageType Language => SpringLanguage.Instance;
+    }
+
+    public class SpringNodeIdentifier : SpringNodeCompositeAntlr
+    {
+        public SpringNodeIdentifier(RuleContext context, NodeType nodeType) : base(context, nodeType)
+        {
+        }
+
+        public string Name => (Context as ToylangParser.IdentifierContext)?.IDENTIFIER().GetText();
+    }
+
+    public class SpringNodeIdentifierDeclaration : SpringNodeCompositeAntlr, IDeclaration
+    {
+        public SpringNodeIdentifierDeclaration(RuleContext context, NodeType nodeType) : base(context, nodeType)
+        {
+            DeclaredElement = new SpringIdentifierDeclared(this);
+        }
+
+        private SpringNodeIdentifier Identifier =>
+            this.Children().First(it => it is SpringNodeIdentifier) as SpringNodeIdentifier;
+
+        public XmlNode GetXMLDoc(bool inherit) => null;
+
+        public void SetName(string name)
+        {
+        }
+
+        public TreeTextRange GetNameRange() => Identifier.GetTreeTextRange();
+
+        public bool IsSynthetic() => false;
+
+        public IDeclaredElement DeclaredElement { get; }
+        public string DeclaredName => Identifier.Name;
     }
 }

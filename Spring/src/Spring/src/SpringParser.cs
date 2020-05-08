@@ -22,6 +22,7 @@ using JetBrains.ReSharper.Psi.ExtensionsAPI;
 using JetBrains.ReSharper.Psi.ExtensionsAPI.Tree;
 using JetBrains.ReSharper.Psi.Files;
 using JetBrains.ReSharper.Psi.Parsing;
+using JetBrains.ReSharper.Psi.Resolve;
 using JetBrains.ReSharper.Psi.Tree;
 using JetBrains.ReSharper.Psi.TreeBuilder;
 using JetBrains.Text;
@@ -96,10 +97,48 @@ namespace JetBrains.ReSharper.Plugins.Spring
                 EndCreatingNode(mark, end, nodeType, data);
             }
 
+            public override Unit VisitStmtVariable(ToylangParser.StmtVariableContext context)
+            {
+                if (context.exception != null)
+                    return Unit.Instance;
+                
+                var interval = context.SourceInterval;
+                CreateNode(context, interval.a, interval.b + 1, SpringCompositeNodeType.NodeTypeIdentifierDeclaration,
+                    context);
+                return Unit.Instance;
+            }
+
             public override Unit VisitStmtFunction(ToylangParser.StmtFunctionContext context)
             {
+                if (context.exception != null)
+                    return Unit.Instance;
+                
                 var interval = context.SourceInterval;
-                CreateNode(context, interval.a, interval.b, SpringCompositeNodeType.NodeTypeFunction, context);
+                CreateNode(context, interval.a, interval.b + 1, SpringCompositeNodeType.NodeTypeIdentifierDeclaration,
+                    context);
+                return Unit.Instance;
+            }
+
+            public override Unit VisitFunctionParameter(ToylangParser.FunctionParameterContext context)
+            {
+                var interval = context.SourceInterval;
+                CreateNode(context, interval.a, interval.b + 1, SpringCompositeNodeType.NodeTypeIdentifierDeclaration,
+                    context);
+                return Unit.Instance;
+            }
+
+            public override Unit VisitIdentifier(ToylangParser.IdentifierContext context)
+            {
+                var interval = context.SourceInterval;
+                CreateNode(context, interval.a, interval.b + 1, SpringCompositeNodeType.NodeTypeIdentifier, context);
+                return Unit.Instance;
+            }
+            
+            
+            public override Unit VisitBlock(ToylangParser.BlockContext context)
+            {
+                var interval = context.SourceInterval;
+                CreateNode(context, interval.a, interval.b + 1, SpringCompositeNodeType.NodeTypeBlock, context);
                 return Unit.Instance;
             }
 
@@ -147,11 +186,13 @@ namespace JetBrains.ReSharper.Plugins.Spring
         private class SpringDaemonProcess : IDaemonStageProcess
         {
             private readonly SpringNodeFile _file;
+            private readonly SpringReferenceFactory _referenceFactory;
 
             public SpringDaemonProcess(IDaemonProcess process, SpringNodeFile file)
             {
                 _file = file;
                 DaemonProcess = process;
+                _referenceFactory = new SpringReferenceFactory();
             }
 
             public void Execute(Action<DaemonStageResult> committer)
@@ -165,6 +206,14 @@ namespace JetBrains.ReSharper.Plugins.Spring
                         var range = error.GetDocumentRange().ExtendRight(error.Length);
                         highlightings.Add(new HighlightingInfo(range,
                             new CSharpSyntaxError(error.ErrorDescription, range)));
+                    }
+
+                    var references = _referenceFactory.GetReferences(treeNode, ReferenceCollection.Empty);
+                    if (references.Any(it => it.Resolve().Info.ResolveErrorType != ResolveErrorType.OK))
+                    {
+                        var range = references.First().GetDocumentRange();
+                        highlightings.Add(new HighlightingInfo(range,
+                            new CSharpSyntaxError("Undefined symbol", range)));
                     }
                 }
 

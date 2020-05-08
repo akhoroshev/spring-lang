@@ -80,6 +80,12 @@ public interface IToylangVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitFunctionParameterNames([NotNull] ToylangParser.FunctionParameterNamesContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ToylangParser.functionParameter"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitFunctionParameter([NotNull] ToylangParser.FunctionParameterContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ToylangParser.stmtWhile"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
